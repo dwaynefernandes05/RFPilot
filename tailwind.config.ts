@@ -14,7 +14,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Manrope', 'system-ui', 'sans-serif'],
+        sans: ['"Google Sans"', 'Manrope', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+        mono: ['"Ubuntu Mono"', 'monospace'],
+        signature: ['"Momo Signature"', 'cursive'],
+        bitcount: ['"Bitcount Single"', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
