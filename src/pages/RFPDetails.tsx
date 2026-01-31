@@ -1,347 +1,231 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   Calendar,
   Building2,
-  Clock,
+  AlertTriangle,
+  ExternalLink,
   Package,
   FileText,
-  ExternalLink,
+  DollarSign,
   Play,
   Cpu,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle,
   Loader2,
-  ChevronRight,
 } from "lucide-react";
+
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
-
-// Mock RFP data
-const mockRFP = {
-  id: "1023",
-  title: "132kV XLPE Power Cables Supply for Substation Augmentation",
-  buyer: "PGCIL (Power Grid Corporation of India Limited)",
-  projectType: "LSTK - Turnkey Substation Project",
-  portal: "GeM Portal",
-  portalLink: "https://gem.gov.in",
-  deadline: "2024-02-15",
-  daysRemaining: 3,
-  scopeItems: 18,
-  estimatedValue: "₹45.2 Cr",
-  priority: "critical" as const,
-  status: "extracted" as const,
-  description:
-    "Supply of 132kV XLPE Power Cables with associated accessories for substation augmentation project in Northern Region. Includes installation support and 24-month warranty.",
-  scopeSummary: [
-    "12 categories of power cables",
-    "Cable accessories (joints, terminations)",
-    "Installation supervision",
-    "Testing & commissioning support",
-  ],
-  testingRequirements: [
-    "Factory Acceptance Tests (FAT)",
-    "Site Acceptance Tests (SAT)",
-    "Type Tests as per IS/IEC standards",
-    "Routine Tests for all batches",
-  ],
-};
-
-const activityLog = [
-  {
-    agent: "sales",
-    action: "RFP discovered on GeM portal",
-    timestamp: "2024-02-10 09:15 AM",
-    status: "completed",
-  },
-  {
-    agent: "sales",
-    action: "Scope of supply extracted (18 line items)",
-    timestamp: "2024-02-10 09:22 AM",
-    status: "completed",
-  },
-  {
-    agent: "technical",
-    action: "Spec matching initiated",
-    timestamp: "2024-02-10 10:00 AM",
-    status: "in-progress",
-  },
-];
+import { Badge } from "@/components/ui/badge";
 
 export default function RFPDetails() {
-  const { id } = useParams();
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleRunAnalysis = () => {
-    setIsAnalyzing(true);
-    setTimeout(() => setIsAnalyzing(false), 3000);
-  };
+  
+
+  const [rfp, setRfp] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+
+ const { rfpId } = useParams();
+const decodedId = decodeURIComponent(rfpId || "");
+
+useEffect(() => {
+  if (!decodedId) return;
+
+  setLoading(false);
+  console.log("Fetching RFP with ID:", decodedId);
+  
+  // Add timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+  fetch(`http://127.0.0.1:8000/rfps/${encodeURIComponent(decodedId)}`, {
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      clearTimeout(timeoutId);
+      console.log("Response status:", res.status);
+      console.log("Response headers:", Object.fromEntries(res.headers.entries()));
+      
+      const text = await res.text();
+      console.log("Raw response:", text);
+      
+      if (!res.ok) throw new Error(`RFP not found (status: ${res.status})`);
+      
+      const data = JSON.parse(text);
+      console.log("RFP data received:", data);
+      
+      // Check if error object is returned
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      setRfp(data);
+      setError(null);
+    })
+    .catch((err) => {
+      clearTimeout(timeoutId);
+      console.error("Fetch error:", err);
+      console.error("Error name:", err.name);
+      console.error("Error message:", err.message);
+      
+      if (err.name === 'AbortError') {
+        setError("Request timeout - Backend not responding");
+      } else if (err.message.includes('Failed to fetch')) {
+        setError("Cannot connect to backend at http://127.0.0.1:8000");
+      } else {
+        setError(err.message);
+      }
+      
+      setRfp(null);
+    })
+    .finally(() => {
+      console.log("Fetch complete, setting loading to false");
+      setLoading(false);
+    });
+}, [decodedId]);
+
+
+
+
+
+  if (loading) {
+    return (
+      <MainLayout title="Loading RFP...">
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!rfp || rfp.error) {
+    return (
+      <MainLayout title="RFP Not Found">
+        <div className="text-center py-20">
+          <p className="text-muted-foreground mb-4">
+            {error || "RFP data not available"}
+          </p>
+          {error && (
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500 rounded-lg max-w-2xl mx-auto">
+              <p className="text-red-500 font-mono text-sm">{error}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Check console for details
+              </p>
+            </div>
+          )}
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
-    <MainLayout
-      title={`RFP #${id}`}
-      breadcrumbs={[
-        { name: "Dashboard", href: "/dashboard" },
-        { name: "RFP Discovery", href: "/discovery" },
-        { name: `RFP #${id}` },
-      ]}
-    >
-      {/* Header Cards */}
+    <MainLayout title={rfp.rfp_title}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Info Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="lg:col-span-2 card-elevated p-6"
-        >
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-mono text-muted-foreground">#{mockRFP.id}</span>
-                <span className="badge-status badge-urgent">{mockRFP.priority}</span>
-                <span className="badge-status badge-extracted">{mockRFP.status}</span>
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">{mockRFP.title}</h1>
+
+        {/* LEFT MAIN CARD */}
+        <motion.div className="lg:col-span-2 card-elevated p-6">
+          <div className="flex justify-between">
+            <div>
+              <p className="text-sm font-mono text-muted-foreground">
+                {decodedId}
+              </p>
+              <h1 className="text-2xl font-bold mt-1">
+                {rfp.rfp_title}
+              </h1>
             </div>
-            <Button variant="ghost" size="icon" asChild>
-              <a href={mockRFP.portalLink} target="_blank" rel="noopener noreferrer">
+
+            <Button size="icon" variant="ghost" asChild>
+              <a href={rfp.tender_source} target="_blank">
                 <ExternalLink className="h-5 w-5" />
               </a>
             </Button>
           </div>
 
-          <p className="mt-4 text-muted-foreground">{mockRFP.description}</p>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Buyer</p>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />
-                <span className="font-medium text-foreground">PGCIL</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Project Type</p>
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <span className="font-medium text-foreground">LSTK</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Scope Size</p>
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" />
-                <span className="font-medium text-foreground">{mockRFP.scopeItems} items</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Est. Value</p>
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-primary" />
-                <span className="font-medium text-foreground">{mockRFP.estimatedValue}</span>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6 pt-6 border-t">
+            <Info label="Buyer" icon={<Building2 />} value={rfp.buyer} />
+            <Info label="Scope Items" icon={<Package />} value={`${rfp.scope_items}`} />
+            <Info label="Est. Value" icon={<DollarSign />} value={rfp.estimated_project_value} />
+            <Info label="Status" icon={<FileText />} value={rfp.status} />
+            <Info label="Days Remaining" icon={<Calendar />} value={`${rfp.days_remaining} days`} />
           </div>
         </motion.div>
 
-        {/* Deadline Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="card-elevated p-6 border-destructive/30 bg-destructive/5"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <h3 className="font-semibold text-foreground">Urgent Deadline</h3>
-          </div>
+        {/* RIGHT DEADLINE BOX */}
+        <motion.div className="card-elevated p-6 border-2 border-red-500 bg-red-500/5">
+  <div className="flex items-center gap-2 mb-4">
+    <AlertTriangle className="h-5 w-5 text-red-500" />
+    <h3 className="font-semibold text-red-500">Submission Deadline</h3>
+  </div>
 
-          <div className="text-center py-4">
-            <p className="text-5xl font-bold text-destructive">{mockRFP.daysRemaining}</p>
-            <p className="text-lg text-muted-foreground">days remaining</p>
-          </div>
+  <div className="text-center">
+    <p className="text-3xl font-bold text-red-500">
+      {rfp.submission_deadline}
+    </p>
 
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
-            <Calendar className="h-4 w-4" />
-            <span>Due: {mockRFP.deadline}</span>
-          </div>
+    <div className="mt-4 flex justify-center">
+      <span
+        className={`px-4 py-1 rounded-full text-sm font-semibold ${
+          rfp.priority === "High"
+            ? "bg-red-600 text-white"
+            : "bg-yellow-400 text-black"
+        }`}
+      >
+        Priority: {rfp.priority}
+      </span>
+    </div>
+  </div>
+</motion.div>
 
-          <div className="mt-6 p-3 rounded-lg bg-destructive/10">
-            <p className="text-xs text-destructive text-center">
-              <strong>90% of wins</strong> correlate with timely action
-            </p>
-          </div>
-        </motion.div>
       </div>
 
-      {/* Actions Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.15 }}
-        className="card-elevated p-4 mt-6 flex flex-wrap items-center gap-4"
-      >
+      {/* ACTION BAR */}
+      <div className="card-elevated p-4 mt-6 flex gap-4">
         <Button
-          variant="default"
           size="lg"
-          className="gap-2"
-          onClick={handleRunAnalysis}
+          onClick={() => {
+            setIsAnalyzing(true);
+            setTimeout(() => setIsAnalyzing(false), 3000);
+          }}
           disabled={isAnalyzing}
         >
           {isAnalyzing ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Analyzing...
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Analyzing
             </>
           ) : (
             <>
-              <Play className="h-5 w-5" />
-              Run Full AI Analysis
+              <Play className="h-4 w-4 mr-2" />
+              Analyze Full RFP (AI)
             </>
           )}
         </Button>
-        <div className="h-8 w-px bg-border hidden sm:block" />
-        <Button variant="outline" className="gap-2">
-          <Cpu className="h-4 w-4" />
-          Run Technical Analysis
+
+        <Button variant="outline">
+          <Cpu className="h-4 w-4 mr-2" />
+          Analyze Technical Specs
         </Button>
-        <Button variant="outline" className="gap-2">
-          <DollarSign className="h-4 w-4" />
-          Run Pricing Analysis
+
+        <Button variant="outline">
+          <DollarSign className="h-4 w-4 mr-2" />
+          Pricing Intelligence
         </Button>
-      </motion.div>
-
-      {/* Tabs Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-        className="mt-6"
-      >
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="specs">Specifications</TabsTrigger>
-            <TabsTrigger value="testing">Testing Req.</TabsTrigger>
-            <TabsTrigger value="attachments">Attachments</TabsTrigger>
-            <TabsTrigger value="activity">Activity Log</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Scope Summary */}
-              <div className="card-elevated p-6">
-                <h3 className="font-semibold text-foreground mb-4">Scope of Supply Summary</h3>
-                <ul className="space-y-3">
-                  {mockRFP.scopeSummary.map((item, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <ChevronRight className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Testing Requirements */}
-              <div className="card-elevated p-6">
-                <h3 className="font-semibold text-foreground mb-4">Testing & Acceptance</h3>
-                <ul className="space-y-3">
-                  {mockRFP.testingRequirements.map((item, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <ChevronRight className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Est. site acceptance tests = significant cost driver
-                </p>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="specs">
-            <div className="card-elevated p-6">
-              <p className="text-muted-foreground text-center py-8">
-                Specifications will be populated after Technical Agent analysis
-              </p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="testing">
-            <div className="card-elevated p-6">
-              <p className="text-muted-foreground text-center py-8">
-                Detailed testing requirements will be extracted by Technical Agent
-              </p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="attachments">
-            <div className="card-elevated p-6">
-              <p className="text-muted-foreground text-center py-8">
-                RFP documents and attachments viewer
-              </p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="activity">
-            <div className="card-elevated p-6">
-              <h3 className="font-semibold text-foreground mb-6">Agent Activity Log</h3>
-              <div className="space-y-4">
-                {activityLog.map((log, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-4 pb-4 border-b border-border last:border-0"
-                  >
-                    <div
-                      className={cn(
-                        "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
-                        log.agent === "sales" && "bg-agent-sales/10",
-                        log.agent === "technical" && "bg-agent-technical/10"
-                      )}
-                    >
-                      {log.status === "completed" ? (
-                        <CheckCircle
-                          className={cn(
-                            "h-4 w-4",
-                            log.agent === "sales" && "text-agent-sales",
-                            log.agent === "technical" && "text-agent-technical"
-                          )}
-                        />
-                      ) : (
-                        <Loader2
-                          className={cn(
-                            "h-4 w-4 animate-spin",
-                            log.agent === "technical" && "text-agent-technical"
-                          )}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{log.action}</p>
-                      <p className="text-xs text-muted-foreground">{log.timestamp}</p>
-                    </div>
-                    <span
-                      className={cn(
-                        "badge-status text-xs",
-                        log.status === "completed" && "badge-analyzed",
-                        log.status === "in-progress" && "badge-extracted"
-                      )}
-                    >
-                      {log.status === "completed" ? "Completed" : "In Progress"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
+      </div>
     </MainLayout>
+  );
+}
+
+function Info({ label, value, icon }: any) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground uppercase">{label}</p>
+      <div className="flex items-center gap-2 mt-1">
+        {icon}
+        <span className="font-medium">{value}</span>
+      </div>
+    </div>
   );
 }
