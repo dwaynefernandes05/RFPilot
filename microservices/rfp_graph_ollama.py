@@ -404,7 +404,7 @@ def select_highest_priority_rfp(state: RFPState) -> RFPState:
 # ============================
 
 # 🔐 MongoDB Atlas Connection (replace with teammate's URI)
-MONGO_URI = "mongodb+srv://admin:Soham1234@cluster0.yqd0rj2.mongodb.net/?appName=Cluster0"
+MONGO_URI = os.getenv("MONGO_URI")
 
 client = MongoClient(MONGO_URI)
 db = client["agentic_rfp"]
