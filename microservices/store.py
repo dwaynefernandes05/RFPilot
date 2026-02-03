@@ -16,6 +16,8 @@ try:
 except Exception:
     USE_MONGO = False
     _rfp_store: Dict[str, Dict[str, Any]] = {}
+    _sales_output: List[Dict[str, Any]] = []  # Store sales agent output separately
+    _master_output: Dict[str, Any] = {}  # Store master agent output separately
     print("[STORE] Using in-memory store")
 
 
@@ -50,7 +52,51 @@ def get_rfp(rfp_id: str):
 
 
 def delete_all_rfps():
+    global _sales_output, _master_output
     if USE_MONGO:
         rfp_collection.delete_many({})
     else:
         _rfp_store.clear()
+        _sales_output = []
+        _master_output = {}
+
+
+def save_sales_output(sales_data: List[Dict[str, Any]]) -> None:
+    """Save sales agent output (all extracted RFPs)"""
+    global _sales_output
+    if USE_MONGO:
+        # Store in a separate collection for sales output
+        sales_collection = db["sales_output"]
+        sales_collection.delete_many({})  # Clear previous
+        if sales_data:
+            sales_collection.insert_many(sales_data)
+    else:
+        _sales_output = sales_data
+
+
+def get_sales_output() -> List[Dict[str, Any]]:
+    """Get sales agent output (all extracted RFPs)"""
+    if USE_MONGO:
+        sales_collection = db["sales_output"]
+        return list(sales_collection.find({}, {"_id": 0}))
+    return _sales_output
+
+
+def save_master_output(master_data: Dict[str, Any]) -> None:
+    """Save master agent output (technical + pricing summaries)"""
+    global _master_output
+    if USE_MONGO:
+        master_collection = db["master_output"]
+        master_collection.delete_many({})  # Clear previous
+        master_collection.insert_one(master_data)
+    else:
+        _master_output = master_data
+
+
+def get_master_output() -> Dict[str, Any]:
+    """Get master agent output (technical + pricing summaries)"""
+    if USE_MONGO:
+        master_collection = db["master_output"]
+        result = master_collection.find_one({}, {"_id": 0})
+        return result if result else {}
+    return _master_output

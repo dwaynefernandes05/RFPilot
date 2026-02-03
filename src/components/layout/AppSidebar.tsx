@@ -11,12 +11,14 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "RFP Discovery", href: "/discovery", icon: Search },
+  { name: "Strategic Orchestrator", href: "/master-agent", icon: Zap },
   { name: "AI Analysis Workspace", href: "/analysis", icon: Brain },
   { name: "Pricing & Summary", href: "/pricing", icon: DollarSign },
   { name: "Proposal Builder", href: "/proposal", icon: FileText },

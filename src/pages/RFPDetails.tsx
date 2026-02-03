@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "react-router-dom";
-import Groq from "groq-sdk"; // Import Groq instead of Gemini
+import Groq from "groq-sdk";
 import {
   Calendar,
   Building2,
@@ -20,11 +20,10 @@ import {
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 
-// Initialize Groq with your API Key
-// Note: In production, use environment variables for keys
+// Initialize Groq with your provided key
 const groq = new Groq({ 
   apiKey: "",
-  dangerouslyAllowBrowser: true // Required for frontend-only calls
+  dangerouslyAllowBrowser: true 
 });
 
 export default function RFPDetails() {
@@ -37,26 +36,28 @@ export default function RFPDetails() {
   const { rfpId } = useParams();
   const decodedId = decodeURIComponent(rfpId || "");
 
-  useEffect(() => {
-    if (!rfpId) return;
-    setLoading(true);
-    
-    const fetchUrl = `http://127.0.0.1:8000/rfps/${rfpId}`;
+  // In RFPDetails.tsx
+useEffect(() => {
+  if (!rfpId) return;
+  setLoading(true);
+  
+  // Use raw rfpId from useParams directly
+  const fetchUrl = `http://127.0.0.1:8000/rfps/${rfpId}`;
 
-    fetch(fetchUrl)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setRfp(data);
-      })
-      .catch((err) => {
-        setError(err.message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [rfpId]);
+  fetch(fetchUrl)
+    .then(async (res) => {
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setRfp(data);
+      setError(null);
+    })
+    .catch((err) => {
+      setError(err.message);
+      setRfp(null);
+    })
+    .finally(() => setLoading(false));
+}, [rfpId]);
+
 
   const handleAnalyzeRFP = async () => {
     if (!rfp) return;
@@ -64,7 +65,6 @@ export default function RFPDetails() {
     setSummary(null);
 
     try {
-      // Groq Chat Completion call
       const chatCompletion = await groq.chat.completions.create({
         messages: [
           {
@@ -73,22 +73,22 @@ export default function RFPDetails() {
           },
           {
             role: "user",
+            // Prompt updated to match new field keys from backend
             content: `Summarize this RFP in professional language. Focus on: 1) Executive Summary, 2) Key Deliverables, and 3) Deadline Urgency. Use bullet points.
 
             RFP Data:
-            Title: ${rfp.rfp_title}
+            Title: ${rfp.title}
             Buyer: ${rfp.buyer}
-            Deadline: ${rfp.submission_deadline}
-            Value: ${rfp.estimated_project_value}
+            Deadline: ${rfp.deadline}
+            Value: ${rfp.estimated_value_cr}
             Priority: ${rfp.priority}`,
           },
         ],
-        model: "llama-3.3-70b-versatile", // High performance model
+        model: "llama-3.3-70b-versatile",
         temperature: 0.5,
       });
 
       const text = chatCompletion.choices[0]?.message?.content;
-      
       if (!text) throw new Error("Empty response from Groq");
       setSummary(text);
     } catch (err: any) {
@@ -119,7 +119,7 @@ export default function RFPDetails() {
           <div class="header"><h1>RFP Intelligence Report</h1></div>
           <div class="meta">
             <strong>ID:</strong> ${rfp.rfp_id}<br/>
-            <strong>Title:</strong> ${rfp.rfp_title}<br/>
+            <strong>Title:</strong> ${rfp.title}<br/>
             <strong>Buyer:</strong> ${rfp.buyer}<br/>
             <strong>Generated:</strong> ${new Date().toLocaleDateString()}
           </div>
@@ -139,27 +139,30 @@ export default function RFPDetails() {
 
   if (!rfp || rfp.error) return (
     <MainLayout title="RFP Not Found">
-      <div className="text-center py-20"><p className="text-muted-foreground mb-4">{error || "RFP data not available"}</p></div>
+      <div className="text-center py-20">
+        <p className="text-muted-foreground mb-4">{error || "RFP data not available"}</p>
+        <Button onClick={() => window.location.reload()}>Retry Connection</Button>
+      </div>
     </MainLayout>
   );
 
   return (
-    <MainLayout title={rfp.rfp_title}>
+    <MainLayout title={rfp.title}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <motion.div className="lg:col-span-2 card-elevated p-6">
           <div className="flex justify-between">
             <div>
               <p className="text-sm font-mono text-muted-foreground">{decodedId}</p>
-              <h1 className="text-2xl font-bold mt-1">{rfp.rfp_title}</h1>
+              <h1 className="text-2xl font-bold mt-1">{rfp.title}</h1>
             </div>
             <Button size="icon" variant="ghost" asChild>
-              <a href={rfp.tender_source} target="_blank" rel="noreferrer"><ExternalLink className="h-5 w-5" /></a>
+              <a href={rfp.source} target="_blank" rel="noreferrer"><ExternalLink className="h-5 w-5" /></a>
             </Button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6 pt-6 border-t">
             <Info label="Buyer" icon={<Building2 />} value={rfp.buyer} />
             <Info label="Scope Items" icon={<Package />} value={`${rfp.scope_items}`} />
-            <Info label="Est. Value" icon={<DollarSign />} value={rfp.estimated_project_value} />
+            <Info label="Est. Value" icon={<DollarSign />} value={rfp.estimated_value_cr} />
             <Info label="Status" icon={<FileText />} value={rfp.status} />
             <Info label="Days Remaining" icon={<Calendar />} value={`${rfp.days_remaining} days`} />
           </div>
@@ -171,7 +174,7 @@ export default function RFPDetails() {
             <h3 className="font-semibold">Submission Deadline</h3>
           </div>
           <div className="text-center">
-            <p className="text-3xl font-bold text-red-500">{rfp.submission_deadline}</p>
+            <p className="text-3xl font-bold text-red-500">{rfp.deadline}</p>
             <div className="mt-4 flex justify-center">
               <span className={`px-4 py-1 rounded-full text-sm font-semibold ${rfp.priority === "High" ? "bg-red-600 text-white" : "bg-yellow-400 text-black"}`}>
                 Priority: {rfp.priority}
@@ -228,6 +231,7 @@ export default function RFPDetails() {
         <Button variant="outline"><Cpu className="h-4 w-4 mr-2" /> Technical Specs</Button>
         <Button variant="outline"><DollarSign className="h-4 w-4 mr-2" /> Pricing Intel</Button>
       </div>
+      
     </MainLayout>
   );
 }

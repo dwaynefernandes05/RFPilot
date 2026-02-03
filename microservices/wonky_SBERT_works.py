@@ -156,8 +156,7 @@ def format_sales_for_frontend(raw: dict, index: int) -> dict:
     est_val_cr = raw.get("estimated_project_value", "")
 
     return {
-        "rfp_id": f"102{index + 3}",  # demo-friendly ID
-        "original_rfp_id": raw.get("rfp_id"),  # Preserve original tender ID
+        "rfp_id": f"#102{index + 3}",  # demo-friendly ID
         "title": raw.get("rfp_title", "Untitled RFP"),
         "buyer": raw.get("buyer"),
         "source": "GeM" if "gem" in raw.get("tender_source", "").lower() else "E-Tender",
@@ -192,7 +191,6 @@ class RFPState(TypedDict, total=False):
 
 def sales_agent_node(state: RFPState) -> RFPState:
     print("\n[Sales Agent] Started")
-    from store import save_sales_output  # Import at the top of function
     results = []
     pdf_paths = []  # Track downloaded PDF paths
 
@@ -364,24 +362,13 @@ JSON Output:
             fields = extract_fields_llm(text)
             fields["tender_source"] = SITE_URL
 
-            # Format and append to results
-            new_rfp = format_sales_for_frontend(fields, i)
-            results.append(new_rfp)
+            results.append(format_sales_for_frontend(fields, i))
             print("[Sales Agent] Extracted:", fields)
-            
-            # 🔥 INCREMENTAL SAVE: Save current list to store immediately
-            # This allows /rfps endpoint to return partial results to frontend
-            save_sales_output(results)
-            print(f"[Sales Agent] Incremental save: RFP {i+1}/{count} now available for frontend")
 
         browser.close()
 
     state["sales_output"] = results
     state["pdf_paths"] = pdf_paths  # Share PDF paths with technical agent
-    
-    # Final save already done incrementally in loop above
-    print(f"[Sales Agent] ✅ All {len(results)} RFPs saved incrementally to store")
-    
     return state
 
 # ============================
@@ -591,7 +578,7 @@ def master_agent_node(state: RFPState) -> RFPState:
     # =============================
     # SAVE TO STORE
     # =============================
-    from store import save_rfp, save_master_output
+    from store import save_rfp
     
     rfp_data = {
         "rfp_id": prioritized_rfp.get("rfp_id"),
@@ -607,14 +594,6 @@ def master_agent_node(state: RFPState) -> RFPState:
     save_rfp(rfp_data)
     print(f"[Master Agent] RFP {prioritized_rfp.get('rfp_id')} saved to store")
     
-    # Save master output separately for /master/output endpoint
-    master_output_data = {
-        "technical_summary": technical_summary,
-        "pricing_summary": state["master_output"]["pricing_summary"]
-    }
-    save_master_output(master_output_data)
-    print(f"[Master Agent] Master output saved to store")
-
     print("[Master Agent] Technical summary prepared and dispatched")
     # =============================
     # DEBUG: PRINT SUMMARIES

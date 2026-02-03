@@ -5,7 +5,7 @@ import uuid
 from typing import Dict
 
 import rfp_graph_ollama
-from store import get_all_rfps, get_rfp, delete_all_rfps
+from store import get_all_rfps, get_rfp, delete_all_rfps, get_sales_output, get_master_output as get_master_from_store
 
 app = FastAPI(title="Agentic RFP Backend")
 
@@ -73,34 +73,60 @@ def run_status(task_id: str):
     }
 
 # -------------------------
-# LIST RFPS
+# LIST RFPS (Sales Agent Output)
 # -------------------------
 @app.get("/rfps")
 def list_rfps():
-    return get_all_rfps()
+    """
+    Returns all RFPs extracted by the sales agent from website scraping
+    """
+    sales_output = get_sales_output()
+    
+    # Always return an array, even if empty
+    if not sales_output or not isinstance(sales_output, list):
+        return []
+    
+    return sales_output
 
 # -------------------------
-# RFP DETAILS
+# RFP DETAILS (From Sales Output)
 # -------------------------
 from urllib.parse import unquote
 
+# In main.py
 @app.get("/rfps/{rfp_id:path}")
 def rfp_details(rfp_id: str):
-    # Log it to see what the backend actually receives
-    print(f"DEBUG: Received RFP ID: {rfp_id}") 
+    sales_output = get_sales_output()
+    if not sales_output:
+        return {"error": "No RFPs available."}
     
-    # Sometimes FastAPI handles the unquoting automatically with :path
-    # Try both ways:
-    rfp = get_rfp(rfp_id)
-    if not rfp:
-        rfp = get_rfp(unquote(rfp_id))
-        
-    if not rfp:
-        return {"error": f"RFP with ID {rfp_id} not found in store"}
-    return rfp
+    # Decodes incoming ID (handles %23, %2F, etc.)
+    decoded_id = unquote(rfp_id)
+    
+    for rfp in sales_output:
+        # Check against the formatted ID AND the original tender ID
+        if (str(rfp.get("rfp_id")) == decoded_id or 
+            str(rfp.get("original_rfp_id")) == decoded_id):
+            return rfp
+    
+    return {"error": f"RFP with ID {decoded_id} not found in sales output"}
 
 
 
+# -------------------------
+# GET MASTER AGENT OUTPUT
+# -------------------------
+@app.get("/master/output")
+def get_master_output():
+    """
+    Returns the master agent output (technical and pricing summaries) for the selected RFP
+    """
+    master_output = get_master_from_store()
+    
+    if not master_output:
+        return {"error": "No master agent output available. Please run the sales agent first."}
+    
+    return master_output
 
 # -------------------------
 # CLEAR RFPS

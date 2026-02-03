@@ -15,7 +15,7 @@ import Notifications from "./pages/Notifications";
 import Repository from "./pages/Repository";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-
+import Masteragent from "./pages/Masteragent";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -37,6 +37,7 @@ const App = () => (
           <Route path="/repository" element={<Repository />} />
           <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/master-agent" element={<Masteragent />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

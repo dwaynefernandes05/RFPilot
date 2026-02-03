@@ -26,30 +26,58 @@ export default function Discovery() {
   // Fetch RFPS
   // -----------------------------
   const fetchRFPs = async () => {
-    const res = await fetch(`${API}/rfps`);
-    const data = await res.json();
-    setRfps(data);
-    return data.length;
+    try {
+      const res = await fetch(`${API}/rfps`);
+      const data = await res.json();
+      
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setRfps(data);
+        return data.length;
+      } else {
+        setRfps([]);
+        return 0;
+      }
+    } catch (error) {
+      console.error("Error fetching RFPs:", error);
+      setRfps([]);
+      return 0;
+    }
   };
 
   // -----------------------------
   // Run Sales Agent + Poll
   // -----------------------------
-  const runSalesAgent = async () => {
-    setIsRunning(true);
-    setRfps([]);
+  // Inside Discovery.tsx -> runSalesAgent function
+const runSalesAgent = async () => {
+  setIsRunning(true);
 
-    await fetch(`${API}/run`, { method: "POST" });
+  // 1. Start the agent and get the task_id
+  const response = await fetch(`${API}/run`, { method: "POST" });
+  const { task_id } = await response.json();
 
-    const poll = setInterval(async () => {
-      const count = await fetchRFPs();
+  // 2. Start polling
+  const poll = setInterval(async () => {
+    // Refresh the table with whatever is currently in the store
+    await fetchRFPs();
 
-      if (count > 0) {
+    // 3. Check the actual background task status
+    try {
+      const statusRes = await fetch(`${API}/run/status/${task_id}`);
+      const { status } = await statusRes.json();
+
+      // Only stop polling when the backend is finished or failed
+      if (status === "completed" || status === "failed") {
         clearInterval(poll);
         setIsRunning(false);
+        // Final fetch to ensure all data is caught
+        await fetchRFPs(); 
       }
-    }, 1500);
-  };
+    } catch (err) {
+      console.error("Status check failed", err);
+    }
+  }, 2000); // Poll every 2 seconds
+};
 
   // -----------------------------
   // Clear RFPS
@@ -69,7 +97,7 @@ export default function Discovery() {
   // -----------------------------
   const filtered = rfps.filter(
     (r) =>
-      r.rfp_title?.toLowerCase().includes(search.toLowerCase()) ||
+      r.title?.toLowerCase().includes(search.toLowerCase()) ||
       r.buyer?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -118,11 +146,11 @@ export default function Discovery() {
                   {rfp.rfp_id}
                 </TableCell>
 
-                <TableCell>{rfp.rfp_title}</TableCell>
+                <TableCell>{rfp.title}</TableCell>
 
-                <TableCell>{rfp.submission_deadline}</TableCell>
+                <TableCell>{rfp.deadline}</TableCell>
 
-                <TableCell>{rfp.estimated_project_value}</TableCell>
+                <TableCell>{rfp.estimated_value_cr}</TableCell>
 
                 {/* PRIORITY */}
                 <TableCell>
