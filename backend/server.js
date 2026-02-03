@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 
 import productRoutes from "./routes/product.js";
 import rfpRoutes from "./routes/rfps.js";
+import testingMatrixRoutes from "./routes/testingMatrix.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ mongoose
 
 app.use("/api/products", productRoutes);
 app.use("/api/rfps", rfpRoutes);
+app.use("/api/testing-matrix", testingMatrixRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>

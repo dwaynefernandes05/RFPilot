@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 
 const API = "http://localhost:5000/api/products";
+const TESTING_API = "http://localhost:5000/api/testing-matrix";
 
 export default function Repository() {
   const [products, setProducts] = useState<any[]>([]);
@@ -45,13 +46,18 @@ export default function Repository() {
   const [unitPrice, setUnitPrice] = useState("");
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Testing Matrix State
+  const [testingMatrix, setTestingMatrix] = useState<any[]>([]);
+  const [editTest, setEditTest] = useState<any | null>(null);
+  const [showAddTestDialog, setShowAddTestDialog] = useState(false);
+  const [testCode, setTestCode] = useState("");
+  const [testName, setTestName] = useState("");
+  const [standardRef, setStandardRef] = useState("");
+  const [testCategory, setTestCategory] = useState("");
+  const [testPrice, setTestPrice] = useState("");
+  const [priceBasis, setPriceBasis] = useState("");
 
-  // RESTORED: Dummy Testing Matrix data
-  const testingPrices = [
-    { id: 1, testType: "Routine Test - LT Cable", standard: "IS 7098", price: 5000 },
-    { id: 2, testType: "Routine Test - HT Cable", standard: "IS 7098", price: 15000 },
-  ];
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadProducts = () => {
     fetch(API)
@@ -60,8 +66,16 @@ export default function Repository() {
       .catch(console.error);
   };
 
+  const loadTestingMatrix = () => {
+    fetch(TESTING_API)
+      .then((res) => res.json())
+      .then(setTestingMatrix)
+      .catch(console.error);
+  };
+
   useEffect(() => {
     loadProducts();
+    loadTestingMatrix();
   }, []);
 
   const filteredProducts = products.filter(
@@ -81,6 +95,16 @@ export default function Repository() {
     setUnitPrice("");
     setCustomFields([]);
     setShowAddDialog(false);
+  };
+
+  const resetTestForm = () => {
+    setTestCode("");
+    setTestName("");
+    setStandardRef("");
+    setTestCategory("");
+    setTestPrice("");
+    setPriceBasis("");
+    setShowAddTestDialog(false);
   };
 
   // ---------------- ACTIONS ----------------
@@ -128,6 +152,57 @@ export default function Repository() {
     if (!confirm("Delete this product permanently?")) return;
     await fetch(`${API}/${id}`, { method: "DELETE" });
     loadProducts();
+  };
+
+  // ---------------- TESTING MATRIX ACTIONS ----------------
+
+  const saveTest = async () => {
+    if (!testCode || !testName || !testPrice) {
+      alert("Test Code, Name, and Price are required");
+      return;
+    }
+    const payload = {
+      test_code: testCode,
+      test_name: testName,
+      standard_reference: standardRef,
+      test_category: testCategory,
+      price_inr: Number(testPrice),
+      price_basis: priceBasis,
+    };
+
+    await fetch(TESTING_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    resetTestForm();
+    loadTestingMatrix();
+  };
+
+  const updateTest = async () => {
+    const payload = {
+      test_code: testCode,
+      test_name: testName,
+      standard_reference: standardRef,
+      test_category: testCategory,
+      price_inr: Number(testPrice),
+      price_basis: priceBasis,
+    };
+
+    await fetch(`${TESTING_API}/${editTest._id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    resetTestForm();
+    setEditTest(null);
+    loadTestingMatrix();
+  };
+
+  const deleteTest = async (id: string) => {
+    if (!confirm("Delete this test permanently?")) return;
+    await fetch(`${TESTING_API}/${id}`, { method: "DELETE" });
+    loadTestingMatrix();
   };
 
   // ---------------- EXPORT / IMPORT LOGIC ----------------
@@ -227,7 +302,10 @@ export default function Repository() {
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
             <Upload className="h-4 w-4 mr-2" /> Import CSV
           </Button>
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => setShowAddDialog(true)}
+          >
             <Plus className="h-4 w-4 mr-2" /> Add Product
           </Button>
         </div>
@@ -235,11 +313,18 @@ export default function Repository() {
 
       <Tabs defaultValue="products">
         <TabsList>
-          <TabsTrigger value="products">
+          <TabsTrigger 
+            value="products"
+            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+          >
             <Database className="h-4 w-4 mr-1" /> Product Catalog
           </TabsTrigger>
-          <TabsTrigger value="testing">
+          <TabsTrigger 
+            value="testing"
+            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+          >
             <DollarSign className="h-4 w-4 mr-1" /> Testing Matrix
+            <Badge variant="secondary" className="ml-2">{testingMatrix.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -247,11 +332,11 @@ export default function Repository() {
           <div className="rounded-xl border mt-3">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                <TableRow className="bg-blue-500">
+                  <TableHead className="text-black">SKU</TableHead>
+                  <TableHead className="text-black">Name</TableHead>
+                  <TableHead className="text-right text-black">Price</TableHead>
+                  <TableHead className="text-center text-black">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -284,23 +369,51 @@ export default function Repository() {
           </div>
         </TabsContent>
 
-        {/* RESTORED: Testing Matrix Content */}
         <TabsContent value="testing">
-          <div className="rounded-xl border mt-3">
+          <div className="flex justify-end mb-3">
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setShowAddTestDialog(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Test
+            </Button>
+          </div>
+          <div className="rounded-xl border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Test Type</TableHead>
-                  <TableHead>Standard</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
+                <TableRow className="bg-blue-500">
+                  <TableHead className="text-black">Test Code</TableHead>
+                  <TableHead className="text-black">Test Name</TableHead>
+                  <TableHead className="text-black">Standard</TableHead>
+                  <TableHead className="text-black">Category</TableHead>
+                  <TableHead className="text-right text-black">Price</TableHead>
+                  <TableHead className="text-center text-black">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {testingPrices.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{t.testType}</TableCell>
-                    <TableCell>{t.standard}</TableCell>
-                    <TableCell className="text-right">₹{t.price}</TableCell>
+                {testingMatrix.map((t) => (
+                  <TableRow key={t._id}>
+                    <TableCell className="font-mono">{t.test_code}</TableCell>
+                    <TableCell>{t.test_name}</TableCell>
+                    <TableCell>{t.standard_reference}</TableCell>
+                    <TableCell>{t.test_category}</TableCell>
+                    <TableCell className="text-right">₹{t.price_inr}</TableCell>
+                    <TableCell className="flex justify-center gap-2">
+                      <Button size="icon" variant="ghost" onClick={() => {
+                        setEditTest(t);
+                        setTestCode(t.test_code);
+                        setTestName(t.test_name);
+                        setStandardRef(t.standard_reference);
+                        setTestCategory(t.test_category);
+                        setTestPrice(String(t.price_inr));
+                        setPriceBasis(t.price_basis || "");
+                      }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteTest(t._id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -355,7 +468,36 @@ export default function Repository() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { resetForm(); setEditProduct(null); }}>Cancel</Button>
-              <Button onClick={editProduct ? updateProduct : saveProduct}>Save</Button>
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={editProduct ? updateProduct : saveProduct}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* TESTING MATRIX ADD/EDIT MODAL */}
+      <Dialog open={showAddTestDialog || !!editTest} onOpenChange={() => { resetTestForm(); setEditTest(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editTest ? "Edit Test" : "Add Test"}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Test Code *</Label><Input value={testCode} onChange={(e) => setTestCode(e.target.value)} /></div>
+            <div><Label>Test Name *</Label><Input value={testName} onChange={(e) => setTestName(e.target.value)} /></div>
+            <div><Label>Standard Reference</Label><Input value={standardRef} onChange={(e) => setStandardRef(e.target.value)} /></div>
+            <div><Label>Test Category</Label><Input value={testCategory} onChange={(e) => setTestCategory(e.target.value)} /></div>
+            <div><Label>Price (INR) *</Label><Input type="number" value={testPrice} onChange={(e) => setTestPrice(e.target.value)} /></div>
+            <div><Label>Price Basis</Label><Input value={priceBasis} onChange={(e) => setPriceBasis(e.target.value)} placeholder="e.g., Per Sample, Per Test" /></div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { resetTestForm(); setEditTest(null); }}>Cancel</Button>
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={editTest ? updateTest : saveTest}
+              >
+                Save
+              </Button>
             </div>
           </div>
         </DialogContent>

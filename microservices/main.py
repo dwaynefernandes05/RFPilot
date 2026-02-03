@@ -86,10 +86,17 @@ from urllib.parse import unquote
 
 @app.get("/rfps/{rfp_id:path}")
 def rfp_details(rfp_id: str):
-    decoded_id = unquote(rfp_id)
-    rfp = get_rfp(decoded_id)
+    # Log it to see what the backend actually receives
+    print(f"DEBUG: Received RFP ID: {rfp_id}") 
+    
+    # Sometimes FastAPI handles the unquoting automatically with :path
+    # Try both ways:
+    rfp = get_rfp(rfp_id)
     if not rfp:
-        return {"error": "RFP not found"}
+        rfp = get_rfp(unquote(rfp_id))
+        
+    if not rfp:
+        return {"error": f"RFP with ID {rfp_id} not found in store"}
     return rfp
 
 
