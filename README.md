@@ -1,73 +1,211 @@
-# Welcome to your Lovable project
+# 🧠 Agentic AI System for Automated RFP → SKU Matching
 
-## Project info
+An end-to-end **Agentic AI pipeline** that automatically discovers RFPs, prioritizes them, extracts technical requirements, semantically matches them to OEM product SKUs, estimates pricing & testing costs, and prepares structured outputs for proposal teams.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Built for **enterprise procurement**, **PSU tenders**, and **large-scale technical bidding workflows**.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🚀 Problem Statement
 
-**Use Lovable**
+Responding to RFPs is:
+- Manual and time-consuming
+- Highly dependent on scarce technical experts
+- Error-prone due to inconsistent RFP formats
+- Slow in identifying the *right-to-win* tenders
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+There is no intelligent system that:
+- Continuously discovers RFPs
+- Prioritizes them by urgency
+- Matches technical specs to OEM SKUs
+- Produces explainable, auditable outputs
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 🎯 Solution Overview
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+This project implements a **multi-agent AI system** where each agent handles a specific responsibility in the RFP lifecycle.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Core Capabilities
+- Automated RFP discovery from tender portals
+- Priority-based RFP selection
+- Explainable technical summaries
+- Semantic SKU matching using SBERT (MiniLM)
+- Spec-match percentage calculation
+- Pricing & testing cost estimation
+- Human-in-the-loop override support
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 🧩 Agent Architecture
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 1️⃣ Sales Agent
+**Responsibility**
+- Scrapes tender portals / dummy websites
+- Extracts key RFP metadata
 
-# Step 3: Install the necessary dependencies.
-npm i
+**Outputs**
+- RFP ID
+- Title
+- Buyer
+- Deadline
+- Estimated value
+- Priority (based on deadline)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+➡️ Sends **highest-priority RFP summary** to Master Agent
+
+---
+
+### 2️⃣ Master Agent (Orchestrator)
+**Responsibility**
+- Selects highest-priority RFP
+- Supports human override (choose next priority)
+- Generates structured summaries for downstream agents
+
+**Outputs**
+- Technical Summary
+- Pricing Summary
+- Explainable AI summary (human-readable)
+
+---
+
+### 3️⃣ Technical Agent
+**Responsibility**
+- Extracts material line items from RFP PDFs
+- Matches RFP requirements to OEM SKUs
+- Computes **Spec Match %** using semantic similarity
+
+**How it works**
+- Uses **SBERT (all-MiniLM-L6-v2)** embeddings
+- Compares RFP specs vs SKU specs using cosine similarity
+- Ranks and selects **Top 3 OEM SKUs** per item
+
+**Outputs**
+- Best-match SKU
+- Top-3 alternatives
+- Spec Match %
+- Match status (Matched / Warning / Not Matched)
+
+---
+
+### 4️⃣ Pricing Agent
+**Responsibility**
+- Assigns material prices from product catalog
+- Assigns testing & acceptance costs from testing matrix
+- Consolidates total material + service costs
+
+**Outputs**
+- Line-item pricing
+- Testing & certification costs
+- Final consolidated price table
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+- **Python**
+- **LangGraph** – agent orchestration
+- **FastAPI** – backend APIs
+- **MongoDB Atlas** – product & pricing repositories
+
+### AI / ML
+- **SBERT (Sentence-Transformers MiniLM)** – semantic matching
+- **Local LLM (Ollama / Mistral)** – item extraction & summaries
+- **Tesseract OCR** – scanned PDF fallback
+
+### Document Processing
+- **pdfplumber** – text extraction from digital PDFs
+- **pdf2image + OCR** – scanned PDFs
+
+---
+
+## 📦 Databases
+
+### Product Catalog (MongoDB)
+Stores OEM SKUs with dynamic specifications.
+
+Example fields:
+```json
+{
+  "sku_code": "CBL-HT-005",
+  "product_name": "HT Aluminum Cable",
+  "unit_price_inr": 2400,
+  "material": "Aluminum",
+  "voltage": "11kV",
+  "insulation": "PVC"
+}
+```
+---
+
+## Testing & Services Repository (MongoDB)
+
+Stores test names and service costs.
+
+Example fields:
+```json
+{
+  "test_name": "High Voltage Withstand Test",
+  "applicable_to": ["HT Cables"],
+  "price_inr": 15000
+}
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## ⚙️ How Spec Match % is Calculated
 
-**Use GitHub Codespaces**
+- Convert RFP item specs → embedding
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Convert SKU specs → embedding
 
-## What technologies are used for this project?
+- Compute cosine similarity
 
-This project is built with:
+- Convert similarity to percentage
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```
+Spec Match % = cosine_similarity × 100
+```
 
-## How can I deploy this project?
+This avoids:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- Regex failures
+- Format dependency
+- Keyword brittleness
 
-## Can I connect a custom domain to my Lovable project?
+--- 
 
-Yes, you can!
+## 🧪 Key Features
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+✅ Works with any RFP format
+✅ Handles scanned PDFs
+✅ Explainable AI outputs
+✅ Human-in-the-loop override
+✅ Modular agent design
+✅ Enterprise-ready architecture
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+--- 
+
+## 🔮 Future Enhancements
+
+- Weighted spec importance
+
+- Historical win-rate learning
+
+- Vendor negotiation intelligence
+
+- Auto-generated proposal PDFs
+
+- Multi-language RFP support
+
+---
+
+## 👥 Team & Use Case
+
+Built as part of an EY Techathon Competition focusing on real-world procurement and automating workflows.
+
+---
+
+## 🙌 Final Note
+
+This system demonstrates how Agentic AI + Semantic Intelligence can radically transform procurement and RFP response workflows — reducing effort from days to minutes.
